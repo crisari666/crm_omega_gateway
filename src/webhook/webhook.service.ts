@@ -1,7 +1,8 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RabbitMqPublisherService } from '../rabbitmq/rabbitmq-publisher.service';
-import { WebhookForwardEnvelope } from './types';
+import { MetaLeadAdsRouterService } from './meta-lead-ads-router.service';
+import { FacebookPageWebhookBody, WebhookForwardEnvelope } from './types';
 
 /**
  * Handles webhook verification and forwards inbound payloads
@@ -15,6 +16,7 @@ export class WebhookService {
   constructor(
     private readonly config: ConfigService,
     private readonly publisher: RabbitMqPublisherService,
+    private readonly metaLeadAdsRouter: MetaLeadAdsRouterService,
   ) {
     this.verifyToken = this.config.get<string>('META_VERIFY_TOKEN', 'omega_gateway_verify');
   }
@@ -45,20 +47,25 @@ export class WebhookService {
     };
     this.logger.log('Forwarding Meta webhook to downstream services');
     await Promise.all([
-      this.publisher.emitToWhatsApp('gateway.meta.webhook', envelope),
-      this.publisher.emitToCrmBack('gateway.meta.webhook', envelope),
+      // this.publisher.emitToWhatsApp('gateway.meta.webhook', envelope),
+      // this.publisher.emitToCrmBack('gateway.meta.webhook', envelope),
+      this.publisher.emitToCustomers('customers.meta.webhook.ingress.v1', envelope),
     ]);
   }
 
-  /** Forwards customers webhook payload to whatsapp_cloud_ms. */
+  /** Ceiba Page webhook: fetch Graph lead, route by form name to customers-ms or office_back. */
+  async forwardCeibaPageWebhook(body: FacebookPageWebhookBody): Promise<void> {
+    await this.metaLeadAdsRouter.dispatchCeibaPageWebhook(body);
+  }
+
+  /** Forwards Meta customers webhook payload to crm-omega-customers-ms (same ingress as `/webhooks/meta`). */
   async forwardCustomersWebhook(payload: unknown): Promise<void> {
-    console.log(JSON.stringify(payload, null, 2));
     const envelope: WebhookForwardEnvelope = {
-      source: 'meta',
+      source: 'customers',
       receivedAt: new Date().toISOString(),
       payload,
     };
-    this.logger.log('Forwarding customers webhook to whatsapp_cloud_ms');
-    await this.publisher.emitToWhatsApp('whatsapp_customers_event', envelope);
+    this.logger.log('Forwarding customers webhook to crm-omega-customers-ms');
+    await this.publisher.emitToCustomers('customers.meta.webhook.ingress.v1', envelope);
   }
 }

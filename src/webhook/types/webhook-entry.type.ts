@@ -16,7 +16,7 @@ export interface MetaWebhookPayload {
 }
 
 export interface WebhookForwardEnvelope {
-  readonly source: 'meta';
+  readonly source: 'meta' | 'customers';
   readonly receivedAt: string;
   readonly payload: unknown;
 }
