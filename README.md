@@ -24,7 +24,39 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Central webhook ingress for Meta (WhatsApp + Lead Ads). Forwards to downstream microservices via RabbitMQ.
+
+### HTTP webhooks
+
+| Route | Purpose |
+|-------|---------|
+| `GET/POST /webhooks/ceiba` | Meta **Page** Lead Ads (`leadgen`). Fetches lead via Graph, routes by form name: `clientes*` → customers-ms, `referidos*` → office_back. |
+| `GET/POST /webhooks/customers` | Meta **WhatsApp** (CRM WABA) → `customers.meta.webhook.ingress.v1` |
+| `POST /webhooks/meta` | Same WhatsApp ingress as customers |
+
+### Environment (Lead Ads / Ceiba)
+
+| Variable | Purpose |
+|----------|---------|
+| `FB_BUSINESS_CEIBA_TOKEN` | Graph token when `IS_DEV=true` (default) |
+| `FB_BUSINESS_CEIBA_TOKEN_PROD` | Graph token when `IS_DEV` is not true |
+| `IS_DEV` | `true` / `1` / `yes` selects dev token (default `true`) |
+| `META_VERIFY_TOKEN` | Meta webhook verify token |
+| `RABBIT_MQ_*` | RabbitMQ connection |
+
+### Meta subscription cutover
+
+1. Point Ceiba Facebook Page webhook to `https://<gateway-host>/webhooks/ceiba` (GET verify + POST).
+2. Keep GTOWER page on `omega_office_back` `POST /rest/webhook/page/gtower` until a second gateway route is added.
+3. Ensure `omega_office_back` runs with `USE_RABBITMQ=true` for `office.facebook.leadgen.ingest.v1`.
+
+### RabbitMQ patterns
+
+| Pattern | Queue | Consumer |
+|---------|-------|----------|
+| `customers.meta.webhook.ingress.v1` | `crm.customers.whatsapp_integration` | crm-omega-customers-ms |
+| `customers.meta.leadgen.ingest.v1` | same | crm-omega-customers-ms (campaign leads) |
+| `office.facebook.leadgen.ingest.v1` | `crm_back_queue` | omega_office_back |
 
 ## Installation
 
