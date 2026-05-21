@@ -17,7 +17,7 @@ import {
 } from './types/meta-lead-ads.type';
 
 const FACEBOOK_GRAPH_API_VERSION = 'v25.0';
-const FACEBOOK_LEAD_FIELDS = 'created_time,field_data,platform,ad_id,form_id';
+const FACEBOOK_LEAD_FIELDS = 'created_time,field_data,platform,ad_id,form_id,campaign_name';
 const FACEBOOK_LEAD_FORM_FIELDS = 'name,status,locale';
 
 export type MetaLeadGraphFetchResult = {
