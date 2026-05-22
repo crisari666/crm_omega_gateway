@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import {
   FacebookLeadFieldRow,
+  FacebookAdCampaignGraphResponse,
   FacebookLeadFormGraphResponse,
   FacebookLeadFormMeta,
   FacebookLeadGraphPayload,
@@ -17,8 +18,9 @@ import {
 } from './types/meta-lead-ads.type';
 
 const FACEBOOK_GRAPH_API_VERSION = 'v25.0';
-const FACEBOOK_LEAD_FIELDS = 'created_time,field_data,platform,ad_id,form_id,campaign_name';
+const FACEBOOK_LEAD_FIELDS = 'created_time,field_data,platform,ad_id,form_id,campaign_id,campaign_name';
 const FACEBOOK_LEAD_FORM_FIELDS = 'name,status,locale';
+const FACEBOOK_AD_CAMPAIGN_FIELDS = 'name,adset{id,name,campaign{id,name}}';
 
 export type MetaLeadGraphFetchResult = {
   readonly leadgenId: string;
@@ -42,6 +44,7 @@ export class MetaLeadAdsService {
   async fetchLeadByLeadgenId(params: {
     readonly leadgenId: string;
     readonly fallbackFormId?: string;
+    readonly fallbackAdId?: string;
   }): Promise<MetaLeadGraphFetchResult> {
     const accessToken = this.resolveCeibaAccessToken();
     const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${params.leadgenId}`;
@@ -53,11 +56,25 @@ export class MetaLeadAdsService {
         },
       }),
     );
+
     const data = response.data;
     if (data.error) {
       throw new UnprocessableEntityException(data.error.message ?? 'Meta Graph API error');
     }
-    const mappedFields = this.mapLeadFields(data.field_data);
+    const adIdFromWebhook = params.fallbackAdId?.trim() ?? '';
+    const adIdFromLead = data.ad_id?.trim() ?? '';
+    const effectiveAdId = adIdFromWebhook.length > 0 ? adIdFromWebhook : adIdFromLead;
+    const campaignNameFromAd =
+      effectiveAdId.length > 0
+        ? await this.fetchCampaignNameByAdId(effectiveAdId, accessToken)
+        : undefined;
+    console.log(JSON.stringify({campaignNameFromAd, data}, null, 2));
+    const resolvedCampaignName = this.resolveCampaignName(campaignNameFromAd, data.campaign_name);
+    const mappedFields = this.mergeGraphScalarsIntoMappedFields(
+      data,
+      this.mapLeadFields(data.field_data),
+      resolvedCampaignName,
+    );
     const formIdFromLead = data.form_id?.trim() ?? '';
     const formIdFallback = params.fallbackFormId?.trim() ?? '';
     const effectiveFormId = formIdFromLead.length > 0 ? formIdFromLead : formIdFallback;
@@ -67,10 +84,11 @@ export class MetaLeadAdsService {
         : undefined;
     const graph: FacebookLeadGraphPayload = {
       fieldData: data.field_data ?? [],
-      adId: data.ad_id,
+      adId: effectiveAdId.length > 0 ? effectiveAdId : data.ad_id,
       formId: data.form_id ?? (formIdFallback.length > 0 ? formIdFallback : undefined),
       createdTime: data.created_time,
       platform: data.platform,
+      campaignName: resolvedCampaignName,
       ...(formMeta != null ? { form: formMeta } : {}),
     };
     const platform = this.resolveGraphPlatform(graph, mappedFields);
@@ -130,6 +148,59 @@ export class MetaLeadAdsService {
     return normalized === 'true' || normalized === '1' || normalized === 'yes';
   }
 
+  private resolveCampaignName(
+    campaignNameFromAd: string | undefined,
+    campaignNameFromLead: string | undefined,
+  ): string | undefined {
+    const fromAd = campaignNameFromAd?.trim();
+    if (fromAd != null && fromAd.length > 0) {
+      return fromAd;
+    }
+    const fromLead = campaignNameFromLead?.trim();
+    if (fromLead != null && fromLead.length > 0) {
+      return fromLead;
+    }
+    return undefined;
+  }
+
+  private async fetchCampaignNameByAdId(
+    adId: string,
+    accessToken: string,
+  ): Promise<string | undefined> {
+    const trimmed = adId.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+    try {
+      const url = `https://graph.facebook.com/${FACEBOOK_GRAPH_API_VERSION}/${trimmed}`;
+      const response = await firstValueFrom(
+        this.httpService.get<FacebookAdCampaignGraphResponse>(url, {
+          params: {
+            access_token: accessToken,
+            fields: FACEBOOK_AD_CAMPAIGN_FIELDS,
+          },
+        }),
+      );
+      const data = response.data;
+      if (data.error) {
+        this.logger.warn(
+          `fetchCampaignNameByAdId adId=${trimmed}: ${data.error.message ?? 'Graph error'}`,
+        );
+        return undefined;
+      }
+      const name = data.campaign?.name?.trim();
+      if (name == null || name.length === 0) {
+        return undefined;
+      }
+      return name;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.log(JSON.stringify({response: err.response.data}, null, 2));
+      this.logger.warn(`fetchCampaignNameByAdId adId=${trimmed}: ${message}`);
+      return undefined;
+    }
+  }
+
   private async fetchLeadFormMetaByFormId(
     formId: string,
     accessToken: string,
@@ -149,6 +220,7 @@ export class MetaLeadAdsService {
         }),
       );
       const data = response.data;
+
       if (data.error) {
         this.logger.warn(
           `fetchLeadFormMetaByFormId formId=${trimmed}: ${data.error.message ?? 'Graph error'}`,
@@ -176,6 +248,23 @@ export class MetaLeadAdsService {
       this.logger.warn(`fetchLeadFormMetaByFormId formId=${trimmed}: ${message}`);
       return undefined;
     }
+  }
+
+  /**
+   * Merges top-level Graph lead scalars (e.g. campaign_name) into mappedFields for downstream persistence.
+   */
+  private mergeGraphScalarsIntoMappedFields(
+    data: FacebookLeadGraphResponse,
+    mappedFields: Record<string, string>,
+    resolvedCampaignName?: string,
+  ): Record<string, string> {
+    const merged: Record<string, string> = { ...mappedFields };
+    const campaignName =
+      resolvedCampaignName?.trim() ?? data.campaign_name?.trim();
+    if (campaignName != null && campaignName.length > 0) {
+      merged.campaign_name = campaignName;
+    }
+    return merged;
   }
 
   private mapLeadFields(fieldData: readonly FacebookLeadFieldRow[] | undefined): Record<string, string> {

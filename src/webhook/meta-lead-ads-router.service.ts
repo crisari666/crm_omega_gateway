@@ -45,10 +45,11 @@ export class MetaLeadAdsRouterService {
     webhookValue: MetaLeadgenIngestEnvelope['webhookValue'],
   ): Promise<void> {
     const fetched = await this.metaLeadAdsService.fetchLeadByLeadgenId({
+
       leadgenId,
       fallbackFormId: webhookValue?.form_id,
+      fallbackAdId: webhookValue?.ad_id,
     });
-    console.log(JSON.stringify(fetched, null, 2));
     const formName = fetched.graph.form?.name;
     const route = this.metaLeadAdsService.resolveRouteTarget(formName);
     if (route === 'unknown') {

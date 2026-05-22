@@ -10,6 +10,7 @@ export type FacebookLeadGraphResponse = {
   readonly form_id?: string;
   readonly created_time?: string;
   readonly platform?: string;
+  readonly campaign_name?: string;
   readonly error?: {
     readonly message: string;
     readonly type?: string;
@@ -34,12 +35,25 @@ export type FacebookLeadFormGraphResponse = {
   };
 };
 
+export type FacebookAdCampaignGraphResponse = {
+  readonly id?: string;
+  readonly campaign?: {
+    readonly name?: string;
+  };
+  readonly error?: {
+    readonly message: string;
+    readonly type?: string;
+    readonly code?: number;
+  };
+};
+
 export type FacebookLeadGraphPayload = {
   readonly fieldData: readonly FacebookLeadFieldRow[];
   readonly adId?: string;
   readonly formId?: string;
   readonly createdTime?: string;
   readonly platform?: string;
+  readonly campaignName?: string;
   readonly form?: FacebookLeadFormMeta;
 };
 
