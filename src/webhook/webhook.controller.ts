@@ -61,7 +61,7 @@ export class WebhookController {
     return { status: 'ok' };
   }
 
-  /** Receives customers webhook events and forwards to whatsapp_cloud_ms. */
+  /** Meta WhatsApp (WABA) webhook → crm-omega-customers-ms only (not whatsapp_cloud_ms). */
   @Post('customers')
   @HttpCode(HttpStatus.OK)
   async handleCustomersWebhook(@Body() body: unknown): Promise<{ status: string }> {

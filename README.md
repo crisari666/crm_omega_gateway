@@ -31,8 +31,10 @@ Central webhook ingress for Meta (WhatsApp + Lead Ads). Forwards to downstream m
 | Route | Purpose |
 |-------|---------|
 | `GET/POST /webhooks/ceiba` | Meta **Page** Lead Ads (`leadgen`). Fetches lead via Graph, routes by form name: `clientes*` → customers-ms, `referidos*` → office_back. |
-| `GET/POST /webhooks/customers` | Meta **WhatsApp** (CRM WABA) → `customers.meta.webhook.ingress.v1` |
+| `GET/POST /webhooks/customers` | Meta **WhatsApp** (CRM WABA) → `customers.meta.webhook.ingress.v1` (customers-ms only; **not** whatsapp_cloud_ms) |
 | `POST /webhooks/meta` | Same WhatsApp ingress as customers |
+
+Meta must **not** be configured to POST to `whatsapp_cloud_ms`; gateway is the sole WABA webhook URL. `whatsapp_cloud_ms` still sends templates via RMQ (`marketing_campaign.ms_ws`).
 
 ### Environment (Lead Ads / Ceiba)
 
