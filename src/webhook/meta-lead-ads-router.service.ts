@@ -54,7 +54,7 @@ export class MetaLeadAdsRouterService {
     const route = this.metaLeadAdsService.resolveRouteTarget(formName);
     if (route === 'unknown') {
       this.logger.warn(
-        `Skipping leadgenId=${leadgenId}: form name "${formName ?? ''}" does not match clientes* or referidos*`,
+        `Skipping leadgenId=${leadgenId}: form name "${formName ?? ''}" does not match datos_clientes*, datos_referidos*, or formulario_masterclass*`,
       );
       return;
     }
@@ -70,6 +70,13 @@ export class MetaLeadAdsRouterService {
     if (route === 'customers') {
       this.logger.log(`Routing leadgenId=${leadgenId} to crm-omega-customers-ms (form=${formName})`);
       await this.publisher.emitToCustomers('customers.meta.leadgen.ingest.v1', envelope);
+      return;
+    }
+    if (route === 'webinar') {
+      this.logger.log(
+        `Routing leadgenId=${leadgenId} to crm-omega-customers-ms webinar (form=${formName})`,
+      );
+      await this.publisher.emitToCustomers('customers.meta.webinar_lead.ingest.v1', envelope);
       return;
     }
     this.logger.log(`Routing leadgenId=${leadgenId} to omega_office_back (form=${formName})`);

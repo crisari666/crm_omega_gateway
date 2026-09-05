@@ -118,13 +118,18 @@ export class MetaLeadAdsService {
     return undefined;
   }
 
-  resolveRouteTarget(formName: string | undefined): 'customers' | 'referidos' | 'unknown' {
+  resolveRouteTarget(
+    formName: string | undefined,
+  ): 'customers' | 'referidos' | 'webinar' | 'unknown' {
     const normalized = (formName ?? '').trim().toLowerCase();
     if (normalized.startsWith('datos_clientes')) {
       return 'customers';
     }
     if (normalized.startsWith('datos_referidos')) {
       return 'referidos';
+    }
+    if (normalized.startsWith('formulario_masterclass')) {
+      return 'webinar';
     }
     return 'unknown';
   }
@@ -264,6 +269,22 @@ export class MetaLeadAdsService {
     if (campaignName != null && campaignName.length > 0) {
       merged.campaign_name = campaignName;
     }
+    const platform = data.platform?.trim();
+    if (platform != null && platform.length > 0) {
+      merged.platform = platform;
+    }
+    const adId = data.ad_id?.trim();
+    if (adId != null && adId.length > 0) {
+      merged.ad_id = adId;
+    }
+    const formId = data.form_id?.trim();
+    if (formId != null && formId.length > 0) {
+      merged.form_id = formId;
+    }
+    const createdTime = data.created_time?.trim();
+    if (createdTime != null && createdTime.length > 0) {
+      merged.created_time = createdTime;
+    }
     return merged;
   }
 
@@ -272,13 +293,14 @@ export class MetaLeadAdsService {
       return {};
     }
     return fieldData.reduce<Record<string, string>>((accumulator, field) => {
-      if (!Array.isArray(field.values) || field.values.length === 0) {
+      if (!field.name) {
         return accumulator;
       }
-      const value = field.values[0];
-      if (value !== undefined && field.name) {
-        accumulator[field.name] = value;
-      }
+      const values = Array.isArray(field.values)
+        ? field.values.filter((value): value is string => typeof value === 'string' && value.length > 0)
+        : [];
+      // Persist every form question key; empty when Meta omits values (e.g. inbox_url).
+      accumulator[field.name] = values.length > 0 ? values.join(', ') : '';
       return accumulator;
     }, {});
   }
