@@ -54,7 +54,7 @@ export class MetaLeadAdsRouterService {
     const route = this.metaLeadAdsService.resolveRouteTarget(formName);
     if (route === 'unknown') {
       this.logger.warn(
-        `Skipping leadgenId=${leadgenId}: form name "${formName ?? ''}" does not match datos_clientes*, datos_referidos*, or formulario_masterclass*`,
+        `Skipping leadgenId=${leadgenId}: form name "${formName ?? ''}" does not match datos_clientes*, formulario_asado*, datos_referidos*, or formulario_masterclass*`,
       );
       return;
     }

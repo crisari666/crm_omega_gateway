@@ -125,6 +125,9 @@ export class MetaLeadAdsService {
     if (normalized.startsWith('datos_clientes')) {
       return 'customers';
     }
+    if (normalized.startsWith('formulario_asado')) {
+      return 'customers';
+    }
     if (normalized.startsWith('datos_referidos')) {
       return 'referidos';
     }

@@ -98,4 +98,4 @@ export interface MetaLeadgenIngestEnvelope {
   readonly contact: MetaLeadgenContact;
 }
 
-export type MetaLeadgenRouteTarget = 'customers' | 'referidos' | 'unknown';
+export type MetaLeadgenRouteTarget = 'customers' | 'referidos' | 'webinar' | 'unknown';
