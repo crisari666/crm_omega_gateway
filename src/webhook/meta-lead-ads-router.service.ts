@@ -54,7 +54,7 @@ export class MetaLeadAdsRouterService {
     const route = this.metaLeadAdsService.resolveRouteTarget(formName);
     if (route === 'unknown') {
       this.logger.warn(
-        `Skipping leadgenId=${leadgenId}: form name "${formName ?? ''}" does not match datos_clientes*, formulario_asado*, datos_referidos*, or formulario_masterclass*`,
+        `Skipping leadgenId=${leadgenId}: form name "${formName ?? ''}" does not match datos_clientes*, formulario_asado*, datos_referidos*, formulario_masterclass*, or asesor(a) comercial*`,
       );
       return;
     }
@@ -79,7 +79,9 @@ export class MetaLeadAdsRouterService {
       await this.publisher.emitToCustomers('customers.meta.webinar_lead.ingest.v1', envelope);
       return;
     }
-    this.logger.log(`Routing leadgenId=${leadgenId} to omega_office_back (form=${formName})`);
-    await this.publisher.emitToCrmBack('office.facebook.leadgen.ingest.v1', envelope);
+    this.logger.log(
+      `Routing leadgenId=${leadgenId} to omega_office_back route=${route} (form=${formName})`,
+    );
+    await this.publisher.emitToCrmBack('office.facebook.leadgen.ingest.v1', { ...envelope, route });
   }
 }

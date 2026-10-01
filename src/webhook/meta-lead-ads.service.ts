@@ -15,9 +15,17 @@ import {
   FacebookLeadGraphPayload,
   FacebookLeadGraphResponse,
   MetaLeadgenContact,
+  MetaLeadgenRouteTarget,
 } from './types/meta-lead-ads.type';
 
 const FACEBOOK_GRAPH_API_VERSION = 'v25.0';
+const FULL_NAME_FIELD_KEYS = [
+  'full_name',
+  'nombre_completo',
+  'nombre_y_apellidos',
+  'nombre_y_apellido',
+  'nombres_y_apellidos',
+] as const;
 const FACEBOOK_LEAD_FIELDS = 'created_time,field_data,platform,ad_id,form_id,campaign_id,campaign_name';
 const FACEBOOK_LEAD_FORM_FIELDS = 'name,status,locale';
 const FACEBOOK_AD_CAMPAIGN_FIELDS = 'name,adset{id,name,campaign{id,name}}';
@@ -118,10 +126,11 @@ export class MetaLeadAdsService {
     return undefined;
   }
 
-  resolveRouteTarget(
-    formName: string | undefined,
-  ): 'customers' | 'referidos' | 'webinar' | 'unknown' {
+  resolveRouteTarget(formName: string | undefined): MetaLeadgenRouteTarget {
     const normalized = (formName ?? '').trim().toLowerCase();
+    if (normalized.startsWith('asesor(a) comercial')) {
+      return 'recruiting';
+    }
     if (normalized.startsWith('datos_clientes')) {
       return 'customers';
     }
@@ -344,7 +353,9 @@ export class MetaLeadAdsService {
     const lookup = this.buildNormalizedFieldLookup(mapped);
     let name = lookup['first_name'] ?? lookup['nombre'] ?? '';
     let lastName = lookup['last_name'] ?? lookup['apellido'] ?? '';
-    const fullName = lookup['full_name'] ?? lookup['nombre_completo'];
+    const fullName = FULL_NAME_FIELD_KEYS.map((key) => lookup[key]).find(
+      (value) => value != null && value.length > 0,
+    );
     if (fullName != null && fullName.length > 0) {
       const parts = fullName.split(/\s+/).filter(Boolean);
       if (name.length === 0 && parts.length > 0) {

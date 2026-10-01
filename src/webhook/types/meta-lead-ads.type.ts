@@ -92,10 +92,17 @@ export interface MetaLeadgenIngestEnvelope {
   readonly source: 'ceiba';
   readonly receivedAt: string;
   readonly leadgenId: string;
+  /** Set for office_back leads; `recruiting` targets the active job campaign. */
+  readonly route?: 'referidos' | 'recruiting';
   readonly webhookValue?: FacebookLeadgenWebhookValue;
   readonly mappedFields: Record<string, string>;
   readonly graph: FacebookLeadGraphPayload;
   readonly contact: MetaLeadgenContact;
 }
 
-export type MetaLeadgenRouteTarget = 'customers' | 'referidos' | 'webinar' | 'unknown';
+export type MetaLeadgenRouteTarget =
+  | 'customers'
+  | 'referidos'
+  | 'webinar'
+  | 'recruiting'
+  | 'unknown';
