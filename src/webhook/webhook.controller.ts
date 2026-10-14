@@ -69,9 +69,25 @@ export class WebhookController {
     await this.webhookService.forwardCustomersWebhook(body);
     return { status: 'ok' };
   }
+  // https://c437-186-72-25-202.ngrok-free.app/ws-cloud/whatsapp-cloud/webhook
+  /** Meta verification challenge for the lead qualification WhatsApp line. */
+  @Get('lead_conversation')
+  verifyLeadConversationWebhook(@Query() query: MetaWebhookQueryDto): string {
+    return this.webhookService.verifyMetaWebhook(
+      query['hub.mode'],
+      query['hub.verify_token'],
+      query['hub.challenge'],
+    );
+  }
 
-
-
+  /** Lead qualification WhatsApp line → crm-omega-customers-ms (`customers.lead_conversation.inbound.v1`). */
+  @Post('lead_conversation')
+  @HttpCode(HttpStatus.OK)
+  async handleLeadConversationWebhook(@Body() body: unknown): Promise<{ status: string }> { 
+    console.log(JSON.stringify(body, null, 2));
+    await this.webhookService.forwardLeadConversationWebhook(body);
+    return { status: 'ok' };
+  }
 
   /** Health-check / smoke test. */
   @Get('test')

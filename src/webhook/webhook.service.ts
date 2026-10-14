@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RabbitMqPublisherService } from '../rabbitmq/rabbitmq-publisher.service';
+import { LEAD_CONVERSATION_INBOUND_PATTERN } from './constants/lead-conversation.constants';
 import { MetaLeadAdsRouterService } from './meta-lead-ads-router.service';
 import { FacebookPageWebhookBody, WebhookForwardEnvelope } from './types';
 
@@ -67,5 +68,15 @@ export class WebhookService {
     };
     this.logger.log('Forwarding customers webhook to crm-omega-customers-ms');
     await this.publisher.emitToCustomers('customers.meta.webhook.ingress.v1', envelope);
+  }
+
+  /** Lead qualification WhatsApp line → crm-omega-customers-ms lead-conversation module. */
+  async forwardLeadConversationWebhook(payload: unknown): Promise<void> {
+    const envelope: WebhookForwardEnvelope = {
+      source: 'lead_conversation',
+      receivedAt: new Date().toISOString(),
+      payload,
+    };
+    await this.publisher.emitToCustomers(LEAD_CONVERSATION_INBOUND_PATTERN, envelope);
   }
 }
