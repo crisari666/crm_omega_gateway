@@ -52,12 +52,6 @@ export class MetaLeadAdsRouterService {
     });
     const formName = fetched.graph.form?.name;
     const route = this.metaLeadAdsService.resolveRouteTarget(formName);
-    if (route === 'unknown') {
-      this.logger.warn(
-        `Skipping leadgenId=${leadgenId}: form name "${formName ?? ''}" does not match datos_clientes*, formulario_asado*, datos_referidos*, formulario_masterclass*, or asesor(a) comercial*`,
-      );
-      return;
-    }
     const envelope: MetaLeadgenIngestEnvelope = {
       source: 'ceiba',
       receivedAt: new Date().toISOString(),
@@ -67,6 +61,15 @@ export class MetaLeadAdsRouterService {
       graph: fetched.graph,
       contact: fetched.contact,
     };
+    // Additive: unknown prefixes still emit to customers-ms so DB form registry can match.
+    // Hardcoded prefixes above stay unchanged (safety net).
+    if (route === 'unknown') {
+      this.logger.log(
+        `Routing leadgenId=${leadgenId} to crm-omega-customers-ms (unknown form name="${formName ?? ''}"; registry may match)`,
+      );
+      await this.publisher.emitToCustomers('customers.meta.leadgen.ingest.v1', envelope);
+      return;
+    }
     if (route === 'customers') {
       this.logger.log(`Routing leadgenId=${leadgenId} to crm-omega-customers-ms (form=${formName})`);
       await this.publisher.emitToCustomers('customers.meta.leadgen.ingest.v1', envelope);
