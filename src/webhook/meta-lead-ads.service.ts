@@ -10,6 +10,7 @@ import { firstValueFrom } from 'rxjs';
 import {
   FacebookLeadFieldRow,
   FacebookAdCampaignGraphResponse,
+  FacebookAdGraphMeta,
   FacebookLeadFormGraphResponse,
   FacebookLeadFormMeta,
   FacebookLeadGraphPayload,
@@ -18,7 +19,7 @@ import {
   MetaLeadgenRouteTarget,
 } from './types/meta-lead-ads.type';
 
-const FACEBOOK_GRAPH_API_VERSION = 'v25.0';
+const FACEBOOK_GRAPH_API_VERSION = 'v26.0';
 const FULL_NAME_FIELD_KEYS = [
   'full_name',
   'nombre_completo',
@@ -28,7 +29,7 @@ const FULL_NAME_FIELD_KEYS = [
 ] as const;
 const FACEBOOK_LEAD_FIELDS = 'created_time,field_data,platform,ad_id,form_id,campaign_id,campaign_name';
 const FACEBOOK_LEAD_FORM_FIELDS = 'name,status,locale';
-const FACEBOOK_AD_CAMPAIGN_FIELDS = 'name,adset{id,name,campaign{id,name}}';
+const FACEBOOK_AD_CAMPAIGN_FIELDS = 'id,name,campaign_id,campaign{id,name},adset{id,name,campaign{id,name}}';
 
 export type MetaLeadGraphFetchResult = {
   readonly leadgenId: string;
@@ -72,16 +73,19 @@ export class MetaLeadAdsService {
     const adIdFromWebhook = params.fallbackAdId?.trim() ?? '';
     const adIdFromLead = data.ad_id?.trim() ?? '';
     const effectiveAdId = adIdFromWebhook.length > 0 ? adIdFromWebhook : adIdFromLead;
-    const campaignNameFromAd =
+    const adMeta =
       effectiveAdId.length > 0
-        ? await this.fetchCampaignNameByAdId(effectiveAdId, accessToken)
+        ? await this.fetchAdMetaByAdId(effectiveAdId, accessToken)
         : undefined;
-    console.log(JSON.stringify({campaignNameFromAd, data}, null, 2));
-    const resolvedCampaignName = this.resolveCampaignName(campaignNameFromAd, data.campaign_name);
+    const resolvedCampaignName = this.resolveCampaignName(
+      adMeta?.campaignName,
+      data.campaign_name,
+    );
     const mappedFields = this.mergeGraphScalarsIntoMappedFields(
       data,
       this.mapLeadFields(data.field_data),
       resolvedCampaignName,
+      adMeta,
     );
     const formIdFromLead = data.form_id?.trim() ?? '';
     const formIdFallback = params.fallbackFormId?.trim() ?? '';
@@ -90,9 +94,16 @@ export class MetaLeadAdsService {
       effectiveFormId.length > 0
         ? await this.fetchLeadFormMetaByFormId(effectiveFormId, accessToken)
         : undefined;
+    const resolvedAdId = effectiveAdId.length > 0 ? effectiveAdId : data.ad_id;
     const graph: FacebookLeadGraphPayload = {
       fieldData: data.field_data ?? [],
-      adId: effectiveAdId.length > 0 ? effectiveAdId : data.ad_id,
+      adId: resolvedAdId,
+      ...(adMeta?.adName != null && adMeta.adName.length > 0
+        ? { adName: adMeta.adName }
+        : {}),
+      ...(adMeta?.campaignId != null && adMeta.campaignId.length > 0
+        ? { campaignId: adMeta.campaignId }
+        : {}),
       formId: data.form_id ?? (formIdFallback.length > 0 ? formIdFallback : undefined),
       createdTime: data.created_time,
       platform: data.platform,
@@ -180,10 +191,10 @@ export class MetaLeadAdsService {
     return undefined;
   }
 
-  private async fetchCampaignNameByAdId(
+  private async fetchAdMetaByAdId(
     adId: string,
     accessToken: string,
-  ): Promise<string | undefined> {
+  ): Promise<FacebookAdGraphMeta | undefined> {
     const trimmed = adId.trim();
     if (trimmed.length === 0) {
       return undefined;
@@ -201,19 +212,37 @@ export class MetaLeadAdsService {
       const data = response.data;
       if (data.error) {
         this.logger.warn(
-          `fetchCampaignNameByAdId adId=${trimmed}: ${data.error.message ?? 'Graph error'}`,
+          `fetchAdMetaByAdId adId=${trimmed}: ${data.error.message ?? 'Graph error'}`,
         );
         return undefined;
       }
-      const name = data.campaign?.name?.trim();
-      if (name == null || name.length === 0) {
+      const adName = data.name?.trim();
+      const campaignId =
+        data.campaign_id?.trim() ||
+        data.campaign?.id?.trim() ||
+        data.adset?.campaign?.id?.trim() ||
+        undefined;
+      const campaignName =
+        data.campaign?.name?.trim() ||
+        data.adset?.campaign?.name?.trim() ||
+        undefined;
+      if (
+        (adName == null || adName.length === 0) &&
+        (campaignId == null || campaignId.length === 0) &&
+        (campaignName == null || campaignName.length === 0)
+      ) {
         return undefined;
       }
-      return name;
+      return {
+        ...(adName != null && adName.length > 0 ? { adName } : {}),
+        ...(campaignId != null && campaignId.length > 0 ? { campaignId } : {}),
+        ...(campaignName != null && campaignName.length > 0
+          ? { campaignName }
+          : {}),
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.log(JSON.stringify({response: err.response.data}, null, 2));
-      this.logger.warn(`fetchCampaignNameByAdId adId=${trimmed}: ${message}`);
+      this.logger.warn(`fetchAdMetaByAdId adId=${trimmed}: ${message}`);
       return undefined;
     }
   }
@@ -274,6 +303,7 @@ export class MetaLeadAdsService {
     data: FacebookLeadGraphResponse,
     mappedFields: Record<string, string>,
     resolvedCampaignName?: string,
+    adMeta?: FacebookAdGraphMeta,
   ): Record<string, string> {
     const merged: Record<string, string> = { ...mappedFields };
     const campaignName =
@@ -288,6 +318,14 @@ export class MetaLeadAdsService {
     const adId = data.ad_id?.trim();
     if (adId != null && adId.length > 0) {
       merged.ad_id = adId;
+    }
+    const adName = adMeta?.adName?.trim();
+    if (adName != null && adName.length > 0) {
+      merged.ad_name = adName;
+    }
+    const campaignId = adMeta?.campaignId?.trim();
+    if (campaignId != null && campaignId.length > 0) {
+      merged.campaign_id = campaignId;
     }
     const formId = data.form_id?.trim();
     if (formId != null && formId.length > 0) {
