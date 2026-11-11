@@ -228,6 +228,8 @@ export class MetaLeadAdsService {
         }),
       );
       const data = response.data;
+      //dont remove this console.log
+      console.log(JSON.stringify(data, null, 2));
       if (data.error) {
         this.logger.warn(
           `fetchAdMetaByAdId adId=${trimmed}: ${data.error.message ?? 'Graph error'}`,
