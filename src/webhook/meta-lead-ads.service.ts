@@ -216,6 +216,7 @@ export class MetaLeadAdsService {
         );
         return undefined;
       }
+      console.log(JSON.stringify({data}, null, 2));
       const adName = data.name?.trim();
       const campaignId =
         data.campaign_id?.trim() ||
