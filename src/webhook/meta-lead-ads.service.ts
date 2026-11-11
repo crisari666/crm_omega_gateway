@@ -81,11 +81,16 @@ export class MetaLeadAdsService {
       adMeta?.campaignName,
       data.campaign_name,
     );
+    const resolvedCampaignId = this.resolveCampaignId(
+      adMeta?.campaignId,
+      data.campaign_id,
+    );
     const mappedFields = this.mergeGraphScalarsIntoMappedFields(
       data,
       this.mapLeadFields(data.field_data),
       resolvedCampaignName,
       adMeta,
+      resolvedCampaignId,
     );
     const formIdFromLead = data.form_id?.trim() ?? '';
     const formIdFallback = params.fallbackFormId?.trim() ?? '';
@@ -101,9 +106,7 @@ export class MetaLeadAdsService {
       ...(adMeta?.adName != null && adMeta.adName.length > 0
         ? { adName: adMeta.adName }
         : {}),
-      ...(adMeta?.campaignId != null && adMeta.campaignId.length > 0
-        ? { campaignId: adMeta.campaignId }
-        : {}),
+      ...(resolvedCampaignId != null ? { campaignId: resolvedCampaignId } : {}),
       formId: data.form_id ?? (formIdFallback.length > 0 ? formIdFallback : undefined),
       createdTime: data.created_time,
       platform: data.platform,
@@ -191,6 +194,21 @@ export class MetaLeadAdsService {
     return undefined;
   }
 
+  private resolveCampaignId(
+    campaignIdFromAd: string | undefined,
+    campaignIdFromLead: string | undefined,
+  ): string | undefined {
+    const fromAd = campaignIdFromAd?.trim();
+    if (fromAd != null && fromAd.length > 0) {
+      return fromAd;
+    }
+    const fromLead = campaignIdFromLead?.trim();
+    if (fromLead != null && fromLead.length > 0) {
+      return fromLead;
+    }
+    return undefined;
+  }
+
   private async fetchAdMetaByAdId(
     adId: string,
     accessToken: string,
@@ -216,7 +234,6 @@ export class MetaLeadAdsService {
         );
         return undefined;
       }
-      console.log(JSON.stringify({data}, null, 2));
       const adName = data.name?.trim();
       const campaignId =
         data.campaign_id?.trim() ||
@@ -305,6 +322,7 @@ export class MetaLeadAdsService {
     mappedFields: Record<string, string>,
     resolvedCampaignName?: string,
     adMeta?: FacebookAdGraphMeta,
+    resolvedCampaignId?: string,
   ): Record<string, string> {
     const merged: Record<string, string> = { ...mappedFields };
     const campaignName =
@@ -324,7 +342,10 @@ export class MetaLeadAdsService {
     if (adName != null && adName.length > 0) {
       merged.ad_name = adName;
     }
-    const campaignId = adMeta?.campaignId?.trim();
+    const campaignId =
+      resolvedCampaignId?.trim() ||
+      adMeta?.campaignId?.trim() ||
+      data.campaign_id?.trim();
     if (campaignId != null && campaignId.length > 0) {
       merged.campaign_id = campaignId;
     }

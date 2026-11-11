@@ -10,6 +10,7 @@ export type FacebookLeadGraphResponse = {
   readonly form_id?: string;
   readonly created_time?: string;
   readonly platform?: string;
+  readonly campaign_id?: string;
   readonly campaign_name?: string;
   readonly error?: {
     readonly message: string;
